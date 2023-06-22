@@ -28,7 +28,7 @@ public class Order {
     @JoinColumn(name = "member_id")
     private Member member;
 
-    @JsonIgnore
+    @BatchSize(size = 100) // 이거보다는 .yml .properties 파일에 default_batch_fetch_size 설정하자!
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems = new ArrayList<>();
 

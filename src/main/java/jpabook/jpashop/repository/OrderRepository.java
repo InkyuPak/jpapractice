@@ -97,12 +97,58 @@ public class OrderRepository {
         return query.getResultList();
     }
 
+    public List<Order> findAll(OrderSearch orderSearch){
+        QOrder order = QOrder.order;
+        QMember member = QMember.member;
+
+        JPAQueryFactory query = new JPAQueryFactory(em);
+        return query.select(order)
+                .from(order)
+                .join(order.member, member)
+                .where(statusEq(orderSearch.getOrderStatus()))
+                .limit(1000)
+                .fetch();
+    }
+
+    private BooleanExpression statusEq(OrderStatus statusCond){
+        if (statusCond == null) {
+            return null;
+        }
+        return QOrder.order.status.eq(statusCond)
+    }
+
     public List<Order> findAllWithMemberDelivery() {
         return em.createQuery("select o from Order o" +
                 " join fetch o.member m" +
-                " join fetch o.delivery d", Order.class).getResultList();
+                " join fetch o.delivery d", Order.class)
+                .getResultList();
     }
 
 
+    public List<Order> findAllWithItem() { // 일대다 상황에서 fetch join을 하면 페이징 처리가 불가능하다(치명적인 단점)
+        return  em.createQuery(
+                        "select distinct o from Order o " + //distinct 중복은 걸러주지만 완전 똑같아야만 걸러준다 근본적인 해결 x
+                                " join fetch o.member m" +
+                                " join fetch o.delivery d " +
+                                " join fetch o.orderItems oi" +
+                                " join fetch oi.item", Order.class)
+                .getResultList();
+    }
+
+    public List<Order> findAllWithMemberDelivery(int offset, int limit) {
+        return em.createQuery("select o from Order o" +
+                        " join fetch o.member m" +
+                        " join fetch o.delivery d", Order.class)
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    // 페이징 처리 하는 방법
+    // 1. X ToOne 관계는 일단 fetch join을 한다. Order입장에선 member, delivery XToOne관계니까 fetch join하자!
+    // 2. 일대다 관계인 orderItems는 fetch join을 하지 않는다
+    // 3. 컬렉션(orderItems)은 지연로딩!
+    // 4. 지연 로딩 성능을 최적화 하기 위해 hibernate.default_batch_fetch_size(글로벌), @BathchSize(개별) 를 적용한다
+    // 5. hibernate.default_batch_fetch_size 설정하면 XToOne관계는 지워도 가능하다!!!!!!!!!
 }
 
